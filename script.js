@@ -1,127 +1,87 @@
-const wordEl = document.getElementById('word');
-const wrongLettersEl = document.getElementById('wrong-letters');
-const playAgainBtn = document.getElementById('play-button');
-const popup = document.getElementById('popup-container');
-const notification = document.getElementById('notification-container');
-const finalMessage = document.getElementById('final-message');
-const finalMessageRevealWord = document.getElementById('final-message-reveal-word');
+const postsContainer = document.getElementById('posts-container');
+const loading = document.querySelector('.loader');
+const filter = document.getElementById('filter');
 
-const figureParts = document.querySelectorAll('.figure-part');
+let limit = 5;  /* How to change the length if I dont have ID in the JSON file? */
+let page = 1;
 
-const words = ['application', 'programming', 'interface', 'wizard'];
+// Fetch posts from API
+async function getPosts() {
+  const res = await fetch(
+    `https://type.fit/api/quotes?_limit=${limit}&_page=${page}`
+  );
 
-let selectedWord = words[Math.floor(Math.random() * words.length)];
+  const data = await res.json();
 
-let playable = true;
-
-const correctLetters = [];
-const wrongLetters = [];
-
-// Show hidden word
-function displayWord() {
-	wordEl.innerHTML = `
-    ${selectedWord
-			.split('')
-			.map(
-				letter => `
-          <span class="letter">
-            ${correctLetters.includes(letter) ? letter : ''}
-          </span>
-        `
-			)
-			.join('')}
-  `;
-
-	const innerWord = wordEl.innerText.replace(/[ \n]/g, '');
-
-	if (innerWord === selectedWord) {
-		finalMessage.innerText = 'Congratulations! You won! 😃';
-		popup.style.display = 'flex';
-
-		playable = false;
-	}
+  return data;
 }
 
-// Update the wrong letters
-function updateWrongLettersEl() {
-	// Display wrong letters
-	wrongLettersEl.innerHTML = `
-    ${wrongLetters.length > 0 ? '<p>Wrong</p>' : ''}
-    ${wrongLetters.map(letter => `<span>${letter}</span>`)}
-  `;
+// Show posts in DOM
+async function showPosts() {
+  const posts = await getPosts();
 
-	// Display parts
-	figureParts.forEach((part, index) => {
-		const errors = wrongLetters.length;
+  posts.forEach(post => {
+    const postEl = document.createElement('div');
+    postEl.classList.add('post');
+    if (post.author == null){
+        postEl.innerHTML = `
+      <div class="post-info">
+        <h2 class="post-title">${'Uknown author'}</h2>
+        <p class="post-body">${post.text}</p>
+      </div>
+    `
+    } else
+    postEl.innerHTML = `
+      <div class="post-info">
+        <h2 class="post-title">${post.author}</h2>
+        <p class="post-body">${post.text}</p>
+      </div>
+    `;
 
-		if (index < errors) {
-			part.style.display = 'block';
-		} else {
-			part.style.display = 'none';
-		}
-	});
-
-	// Check if lost
-	if (wrongLetters.length === figureParts.length) {
-		finalMessage.innerText = 'Unfortunately you lost. 😕';
-		finalMessageRevealWord.innerText = `...the word was: ${selectedWord}`;
-		popup.style.display = 'flex';
-
-		playable = false;
-	}
+    postsContainer.appendChild(postEl);
+  });
 }
 
-// Show notification
-function showNotification() {
-	notification.classList.add('show');
+// Show loader & fetch more posts
+function showLoading() {
+  loading.classList.add('show');
 
-	setTimeout(() => {
-		notification.classList.remove('show');
-	}, 2000);
+  setTimeout(() => {
+    loading.classList.remove('show');
+
+    setTimeout(() => {
+      page++;
+      showPosts();
+    }, 300);
+  }, 1000);
 }
 
-// Keydown letter press
-window.addEventListener('keydown', e => {
-	if (playable) {
-		if (e.keyCode >= 65 && e.keyCode <= 90) {
-			const letter = e.key.toLowerCase();
+// Filter posts by input
+function filterPosts(e) {
+  const term = e.target.value.toUpperCase();
+  const posts = document.querySelectorAll('.post');
 
-			if (selectedWord.includes(letter)) {
-				if (!correctLetters.includes(letter)) {
-					correctLetters.push(letter);
+  posts.forEach(post => {
+    const title = post.querySelector('.post-title').innerText.toUpperCase();
+    const body = post.querySelector('.post-body').innerText.toUpperCase();
 
-					displayWord();
-				} else {
-					showNotification();
-				}
-			} else {
-				if (!wrongLetters.includes(letter)) {
-					wrongLetters.push(letter);
+    if (title.indexOf(term) > -1 || body.indexOf(term) > -1) {
+      post.style.display = 'flex';
+    } else {
+      post.style.display = 'none';
+    }
+  });
+}
 
-					updateWrongLettersEl();
-				} else {
-					showNotification();
-				}
-			}
-		}
-	}
+// Show initial posts
+showPosts();
+
+window.addEventListener('scroll', () => {
+  const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+
+  if (scrollTop + clientHeight >= scrollHeight - 5) {
+    showLoading();
+  }
 });
 
-// Restart game and play again
-playAgainBtn.addEventListener('click', () => {
-	playable = true;
-
-	//  Empty arrays
-	correctLetters.splice(0);
-	wrongLetters.splice(0);
-
-	selectedWord = words[Math.floor(Math.random() * words.length)];
-
-	displayWord();
-
-	updateWrongLettersEl();
-
-	popup.style.display = 'none';
-});
-
-displayWord();
+filter.addEventListener('input', filterPosts);
